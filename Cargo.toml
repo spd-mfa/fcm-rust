@@ -20,21 +20,21 @@ default = ["native-tls"]
 
 native-tls = ["reqwest/native-tls", "yup-oauth2/hyper-tls", "yup-oauth2/ring"]
 native-tls-vendored = ["reqwest/native-tls-vendored", "yup-oauth2/hyper-tls", "yup-oauth2/ring"]
-rustls-tls = ["reqwest/rustls-tls", "yup-oauth2/hyper-rustls", "yup-oauth2/ring"]
-rustls-tls-native-roots = ["reqwest/rustls-tls-native-roots", "yup-oauth2/hyper-rustls", "yup-oauth2/ring"]
+rustls-tls = ["reqwest/rustls", "yup-oauth2/hyper-rustls", "yup-oauth2/ring"]
+rustls-tls-native-roots = ["reqwest/rustls", "yup-oauth2/hyper-rustls", "yup-oauth2/ring"]
 # rustls on aws-lc with no ring. reqwest uses the process-default rustls provider, which the
 # application must install before building a client (e.g. to select aws-lc's FIPS module).
-rustls-tls-aws-lc = ["reqwest/rustls-tls-native-roots-no-provider", "yup-oauth2/hyper-rustls", "yup-oauth2/aws-lc-rs"]
+rustls-tls-aws-lc = ["reqwest/rustls-no-provider", "yup-oauth2/hyper-rustls", "yup-oauth2/aws-lc-rs"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 tokio = { version = "1", features = ["fs"] }
-reqwest = { version = "0.12", features = ["json", "charset", "http2", "macos-system-configuration"], default-features = false }
+reqwest = { version = "0.13", features = ["json", "charset", "http2", "system-proxy"], default-features = false }
 chrono = "0.4"
 thiserror = "1"
 dotenvy = "0.15"
-yup-oauth2 = { version = "11", features = ["service-account"], default-features = false }
+yup-oauth2 = { version = "12", features = ["service-account"], default-features = false }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }

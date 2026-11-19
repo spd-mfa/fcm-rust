@@ -113,7 +113,7 @@ impl FcmClient {
         let builder = reqwest::ClientBuilder::new();
         // Another crate enabling reqwest's native-tls would otherwise make it the default backend.
         #[cfg(feature = "rustls-tls-aws-lc")]
-        let builder = builder.use_rustls_tls();
+        let builder = builder.tls_backend_rustls();
         let builder = if let Some(timeout) = fcm_builder.fcm_request_timeout {
             builder.timeout(timeout)
         } else {
