@@ -45,6 +45,7 @@ pub struct FcmClientBuilder {
     service_account_key_json_path: Option<PathBuf>,
     token_cache_json_path: Option<PathBuf>,
     fcm_request_timeout: Option<Duration>,
+    http_client: Option<reqwest::Client>,
     dry_run: Option<bool>,
 }
 
@@ -68,6 +69,15 @@ impl FcmClientBuilder {
     /// <https://firebase.google.com/docs/cloud-messaging/scale-fcm#timeouts>
     pub fn fcm_request_timeout(mut self, fcm_request_timeout: Duration) -> Self {
         self.fcm_request_timeout = Some(fcm_request_timeout);
+        self
+    }
+
+    /// Set the HTTP client for FCM requests, e.g. to configure connection pooling and keepalive.
+    /// Default is a client with reqwest's defaults (and the rustls backend with `rustls-tls-aws-lc`).
+    ///
+    /// `fcm_request_timeout` still applies to each request.
+    pub fn http_client(mut self, http_client: reqwest::Client) -> Self {
+        self.http_client = Some(http_client);
         self
     }
 
@@ -100,6 +110,7 @@ impl FcmClientBuilder {
 /// An async client for sending the notification payload.
 pub struct FcmClient {
     http_client: reqwest::Client,
+    request_timeout: Option<Duration>,
     oauth_client: OauthClient,
     pub dry_run: bool,
 }
@@ -110,16 +121,16 @@ impl FcmClient {
     }
 
     async fn new_from_builder(fcm_builder: FcmClientBuilder) -> Result<Self, FcmClientError> {
-        let builder = reqwest::ClientBuilder::new();
-        // Another crate enabling reqwest's native-tls would otherwise make it the default backend.
-        #[cfg(feature = "rustls-tls-aws-lc")]
-        let builder = builder.tls_backend_rustls();
-        let builder = if let Some(timeout) = fcm_builder.fcm_request_timeout {
-            builder.timeout(timeout)
-        } else {
-            builder
+        let http_client = match fcm_builder.http_client {
+            Some(http_client) => http_client,
+            None => {
+                let builder = reqwest::ClientBuilder::new();
+                // Another crate enabling reqwest's native-tls would otherwise make it the default backend.
+                #[cfg(feature = "rustls-tls-aws-lc")]
+                let builder = builder.tls_backend_rustls();
+                builder.build()?
+            }
         };
-        let http_client = builder.build()?;
 
         let oauth_client = if let Some(key_json) = fcm_builder.service_account_key_json_string {
             OauthClient::create_with_string_key(key_json, fcm_builder.token_cache_json_path)
@@ -139,6 +150,7 @@ impl FcmClient {
 
         Ok(FcmClient {
             http_client,
+            request_timeout: fcm_builder.fcm_request_timeout,
             oauth_client,
             dry_run: fcm_builder.dry_run.unwrap_or(false),
         })
@@ -161,8 +173,13 @@ impl FcmClient {
             .http_client
             .post(&url)
             .bearer_auth(access_token)
-            .json(&MessageWrapper::new(message.as_ref(), self.dry_run))
-            .build()?;
+            .json(&MessageWrapper::new(message.as_ref(), self.dry_run));
+        let request = if let Some(timeout) = self.request_timeout {
+            request.timeout(timeout)
+        } else {
+            request
+        };
+        let request = request.build()?;
 
         let response = self.http_client.execute(request).await?;
         let retry_after = response.headers().get(RETRY_AFTER);
